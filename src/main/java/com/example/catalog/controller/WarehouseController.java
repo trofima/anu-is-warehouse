@@ -2,11 +2,10 @@ package com.example.catalog.controller;
 
 import com.example.catalog.entities.Product;
 import com.example.catalog.dtos.ProductDto;
+import com.example.catalog.repository.ProductRepository;
+
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import jakarta.validation.Valid;
@@ -26,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/products")
 public class WarehouseController {
-    // TODO: use repository
-    private final Map<Long, Product> store = new ConcurrentHashMap<>();
-    private final AtomicLong idSeq = new AtomicLong(1);
+    private final ProductRepository productRepository;
+
+    public WarehouseController(ProductRepository productRepository) {
+        this.productRepository = productRepository;
+    }
 
     @GetMapping
     public List<Product> list(
@@ -38,8 +39,7 @@ public class WarehouseController {
             @RequestParam(value = "maxPrice", required = false) BigDecimal maxPrice,
             @RequestParam(value = "inStock", required = false) Boolean inStock) {
 
-              // TODO: rethink
-        return store.values().stream()
+        return productRepository.findAll().stream()
                 .filter(product -> name == null || (product.getName() != null && product.getName().toLowerCase().contains(name.toLowerCase())))
                 .filter(product -> category == null || (product.getCategory() != null && product.getCategory().equalsIgnoreCase(category)))
                 .filter(product -> minPrice == null || (product.getPrice() != null && product.getPrice().compareTo(minPrice) >= 0))
@@ -50,46 +50,43 @@ public class WarehouseController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Product> get(@PathVariable Long id) {
-        Product product = store.get(id);
-        if (product == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(product);
+        return productRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
     public ResponseEntity<Product> create(@RequestBody @Valid ProductDto productDto) {
         Product product = new Product();
-        product.setId(idSeq.getAndIncrement());
         product.setName(productDto.name());
         product.setDescription(productDto.description());
         product.setPrice(productDto.price());
         product.setCategory(productDto.category());
         product.setInStock(productDto.inStock());
-        store.put(product.getId(), product);
-        return new ResponseEntity<>(product, HttpStatus.CREATED);
+        Product savedProduct = productRepository.save(product);
+        return new ResponseEntity<>(savedProduct, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Product> update(@PathVariable Long id, @RequestBody @Valid ProductDto productDto) {
-        Product existingProduct = store.get(id);
-        if (existingProduct == null) {
-            return ResponseEntity.notFound().build();
-        }
-        existingProduct.setName(productDto.name());
-        existingProduct.setDescription(productDto.description());
-        existingProduct.setPrice(productDto.price());
-        existingProduct.setCategory(productDto.category());
-        existingProduct.setInStock(productDto.inStock());
-        return ResponseEntity.ok(existingProduct);
+        return productRepository.findById(id)
+                .map(existingProduct -> {
+                    existingProduct.setName(productDto.name());
+                    existingProduct.setDescription(productDto.description());
+                    existingProduct.setPrice(productDto.price());
+                    existingProduct.setCategory(productDto.category());
+                    existingProduct.setInStock(productDto.inStock());
+                    return ResponseEntity.ok(productRepository.save(existingProduct));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        Product removedProduct = store.remove(id);
-        if (removedProduct == null) {
+        if (!productRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
+        productRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 }
