@@ -1,4 +1,4 @@
-package com.example.catalog.dtos;
+package com.isd.warehouse.dtos;
 
 import java.math.BigDecimal;
 
