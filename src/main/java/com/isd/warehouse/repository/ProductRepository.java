@@ -1,6 +1,6 @@
-package com.example.catalog.repository;
+package com.isd.warehouse.repository;
 
-import com.example.catalog.entities.Product;
+import com.isd.warehouse.entities.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

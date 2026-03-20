@@ -1,8 +1,8 @@
-package com.example.catalog.controller;
+package com.isd.warehouse.controller;
 
-import com.example.catalog.entities.Product;
-import com.example.catalog.dtos.ProductDto;
-import com.example.catalog.repository.ProductRepository;
+import com.isd.warehouse.entities.Product;
+import com.isd.warehouse.dtos.ProductDto;
+import com.isd.warehouse.repository.ProductRepository;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -33,11 +33,11 @@ public class WarehouseController {
 
     @GetMapping
     public List<Product> list(
-            @RequestParam(value = "name", required = false) String name,
-            @RequestParam(value = "category", required = false) String category,
-            @RequestParam(value = "minPrice", required = false) BigDecimal minPrice,
-            @RequestParam(value = "maxPrice", required = false) BigDecimal maxPrice,
-            @RequestParam(value = "inStock", required = false) Boolean inStock) {
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Boolean inStock) {
 
         return productRepository.findAll().stream()
                 .filter(product -> name == null || (product.getName() != null && product.getName().toLowerCase().contains(name.toLowerCase())))

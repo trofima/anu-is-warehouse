@@ -1,4 +1,4 @@
-package com.example.catalog.entities;
+package com.isd.warehouse.entities;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
