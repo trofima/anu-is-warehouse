@@ -1,7 +1,9 @@
 package com.isd.warehouse.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.isd.warehouse.entities.Inventory;
 import com.isd.warehouse.entities.Product;
+import com.isd.warehouse.repository.InventoryRepository;
 import com.isd.warehouse.repository.ProductRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,13 +43,18 @@ class WarehouseControllerIntegrationTest {
     @Autowired
     private ProductRepository productRepository;
 
+    @Autowired
+    private InventoryRepository inventoryRepository;
+
     @BeforeEach
     void setUp() {
+        inventoryRepository.deleteAll();
         productRepository.deleteAll();
     }
 
     @AfterEach
     void tearDown() {
+        inventoryRepository.deleteAll();
         productRepository.deleteAll();
     }
 
@@ -264,6 +271,105 @@ class WarehouseControllerIntegrationTest {
         @DisplayName("should return 404 when non-numeric ID is provided")
         void shouldReturn404WhenNonNumericIdProvided() throws Exception {
             mockMvc.perform(get("/api/products/invalid-id"))
+                .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/products/{id}/receive - Receive Product Stock")
+    class ReceiveProductStock {
+
+        @Test
+        @DisplayName("should create inventory and receive stock for product without inventory")
+        void shouldCreateInventoryAndReceiveStock() throws Exception {
+            Product product = new Product();
+            product.setName("Keyboard");
+            product.setPrice(new BigDecimal("89.99"));
+            product.setInStock(false);
+            Product savedProduct = productRepository.save(product);
+
+            mockMvc.perform(post("/api/products/" + savedProduct.getId() + "/receive")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 12
+                        }
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.productId", is(savedProduct.getId().intValue())))
+                .andExpect(jsonPath("$.quantity", is(12)))
+                .andExpect(jsonPath("$.reservedQuantity", is(0)))
+                .andExpect(jsonPath("$.availableQuantity", is(12)));
+
+            Inventory inventory = inventoryRepository.findByProductId(savedProduct.getId()).orElseThrow();
+            assertEquals(12, inventory.getQuantity());
+            assertEquals(0, inventory.getReservedQuantity());
+            assertEquals(true, productRepository.findById(savedProduct.getId()).orElseThrow().isInStock());
+        }
+
+        @Test
+        @DisplayName("should add received quantity to existing inventory")
+        void shouldAddReceivedQuantityToExistingInventory() throws Exception {
+            Product product = new Product();
+            product.setName("Mouse");
+            product.setPrice(new BigDecimal("49.99"));
+            product.setInStock(true);
+            Product savedProduct = productRepository.save(product);
+
+            Inventory inventory = new Inventory();
+            inventory.setProduct(savedProduct);
+            inventory.setQuantity(5);
+            inventory.setReservedQuantity(2);
+            inventoryRepository.save(inventory);
+
+            mockMvc.perform(post("/api/products/" + savedProduct.getId() + "/receive")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 7
+                        }
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.productId", is(savedProduct.getId().intValue())))
+                .andExpect(jsonPath("$.quantity", is(12)))
+                .andExpect(jsonPath("$.reservedQuantity", is(2)))
+                .andExpect(jsonPath("$.availableQuantity", is(10)));
+
+            Inventory updatedInventory = inventoryRepository.findByProductId(savedProduct.getId()).orElseThrow();
+            assertEquals(12, updatedInventory.getQuantity());
+            assertEquals(2, updatedInventory.getReservedQuantity());
+        }
+
+        @Test
+        @DisplayName("should return 404 when receiving stock for unknown product")
+        void shouldReturn404WhenReceivingUnknownProduct() throws Exception {
+            mockMvc.perform(post("/api/products/99999/receive")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 3
+                        }
+                        """))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("should return 400 when received quantity is zero")
+        void shouldReturn400WhenReceivedQuantityIsZero() throws Exception {
+            Product product = new Product();
+            product.setName("Dock");
+            product.setPrice(new BigDecimal("129.99"));
+            product.setInStock(false);
+            Product savedProduct = productRepository.save(product);
+
+            mockMvc.perform(post("/api/products/" + savedProduct.getId() + "/receive")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 0
+                        }
+                        """))
                 .andExpect(status().isBadRequest());
         }
     }

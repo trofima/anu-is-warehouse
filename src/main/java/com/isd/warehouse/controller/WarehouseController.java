@@ -1,13 +1,16 @@
 package com.isd.warehouse.controller;
 
+import com.isd.warehouse.dtos.InventoryReceiptDto;
 import com.isd.warehouse.entities.Product;
 import com.isd.warehouse.dtos.ProductDto;
+import com.isd.warehouse.dtos.ReceiveProductDto;
+import com.isd.warehouse.entities.Inventory;
+import com.isd.warehouse.repository.InventoryRepository;
 import com.isd.warehouse.repository.ProductRepository;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,9 +38,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/products")
 public class WarehouseController {
     private final ProductRepository productRepository;
+    private final InventoryRepository inventoryRepository;
 
-    public WarehouseController(ProductRepository productRepository) {
+    public WarehouseController(ProductRepository productRepository, InventoryRepository inventoryRepository) {
         this.productRepository = productRepository;
+        this.inventoryRepository = inventoryRepository;
     }
 
     @Operation(summary = "List all products", description = "Returns a list of products with optional filtering by name, category, price range, and stock status")
@@ -137,5 +142,47 @@ public class WarehouseController {
         }
         productRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Receive product stock", description = "Adds received quantity to the warehouse inventory for a product")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Product stock received successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid receiving data", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Product not found", content = @Content)
+    })
+    @PostMapping("/{id}/receive")
+    public ResponseEntity<InventoryReceiptDto> receive(
+            @Parameter(description = "Product ID", required = true)
+            @PathVariable Long id,
+            @Parameter(description = "Receiving data", required = true)
+            @RequestBody @Valid ReceiveProductDto receiveProductDto) {
+        return productRepository.findById(id)
+                .map(product -> {
+                    Inventory inventory = inventoryRepository.findByProductId(id)
+                            .orElseGet(() -> {
+                                Inventory newInventory = new Inventory();
+                                newInventory.setProduct(product);
+                                newInventory.setReservedQuantity(0);
+                                newInventory.setQuantity(0);
+                                return newInventory;
+                            });
+
+                    inventory.setQuantity(inventory.getQuantity() + receiveProductDto.quantity());
+                    product.setInStock(inventory.getQuantity() > inventory.getReservedQuantity());
+
+                    Inventory savedInventory = inventoryRepository.save(inventory);
+                    productRepository.save(product);
+
+                    return ResponseEntity.ok(toInventoryReceiptDto(savedInventory));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    private InventoryReceiptDto toInventoryReceiptDto(Inventory inventory) {
+        return new InventoryReceiptDto(
+                inventory.getProduct().getId(),
+                inventory.getQuantity(),
+                inventory.getReservedQuantity(),
+                inventory.getQuantity() - inventory.getReservedQuantity());
     }
 }
