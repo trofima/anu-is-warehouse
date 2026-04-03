@@ -1,6 +1,7 @@
 package com.isd.warehouse.controller;
 
 import com.isd.warehouse.dtos.InventoryReceiptDto;
+import com.isd.warehouse.dtos.FulfillProductDto;
 import com.isd.warehouse.entities.Product;
 import com.isd.warehouse.dtos.ProductDto;
 import com.isd.warehouse.dtos.ReceiveProductDto;
@@ -200,6 +201,38 @@ public class WarehouseController {
                             }
 
                             inventory.setReservedQuantity(inventory.getReservedQuantity() + reserveProductDto.quantity());
+                            product.setInStock(inventory.getQuantity() > inventory.getReservedQuantity());
+
+                            Inventory savedInventory = inventoryRepository.save(inventory);
+                            productRepository.save(product);
+
+                            return ResponseEntity.ok(toInventoryReceiptDto(savedInventory));
+                        })
+                        .orElse(ResponseEntity.notFound().build()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "Fulfill reserved product stock", description = "Fulfills reserved warehouse inventory for a product")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Reserved product stock fulfilled successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid fulfillment data or insufficient reserved stock", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Product or inventory not found", content = @Content)
+    })
+    @PostMapping("/{id}/fulfill")
+    public ResponseEntity<InventoryReceiptDto> fulfill(
+            @Parameter(description = "Product ID", required = true)
+            @PathVariable Long id,
+            @Parameter(description = "Fulfillment data", required = true)
+            @RequestBody @Valid FulfillProductDto fulfillProductDto) {
+        return productRepository.findById(id)
+                .map(product -> inventoryRepository.findByProductId(id)
+                        .map(inventory -> {
+                            if (fulfillProductDto.quantity() > inventory.getReservedQuantity()) {
+                                return ResponseEntity.badRequest().<InventoryReceiptDto>build();
+                            }
+
+                            inventory.setQuantity(inventory.getQuantity() - fulfillProductDto.quantity());
+                            inventory.setReservedQuantity(inventory.getReservedQuantity() - fulfillProductDto.quantity());
                             product.setInStock(inventory.getQuantity() > inventory.getReservedQuantity());
 
                             Inventory savedInventory = inventoryRepository.save(inventory);
