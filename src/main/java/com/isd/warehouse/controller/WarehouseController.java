@@ -1,5 +1,6 @@
 package com.isd.warehouse.controller;
 
+import com.isd.warehouse.dtos.CancelReservationDto;
 import com.isd.warehouse.dtos.InventoryReceiptDto;
 import com.isd.warehouse.dtos.FulfillProductDto;
 import com.isd.warehouse.entities.Product;
@@ -233,6 +234,37 @@ public class WarehouseController {
 
                             inventory.setQuantity(inventory.getQuantity() - fulfillProductDto.quantity());
                             inventory.setReservedQuantity(inventory.getReservedQuantity() - fulfillProductDto.quantity());
+                            product.setInStock(inventory.getQuantity() > inventory.getReservedQuantity());
+
+                            Inventory savedInventory = inventoryRepository.save(inventory);
+                            productRepository.save(product);
+
+                            return ResponseEntity.ok(toInventoryReceiptDto(savedInventory));
+                        })
+                        .orElse(ResponseEntity.notFound().build()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "Cancel reserved product stock", description = "Cancels reserved warehouse inventory for a product")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Reserved product stock canceled successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid cancellation data or insufficient reserved stock", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Product or inventory not found", content = @Content)
+    })
+    @PostMapping("/{id}/cancel-reservation")
+    public ResponseEntity<InventoryReceiptDto> cancelReservation(
+            @Parameter(description = "Product ID", required = true)
+            @PathVariable Long id,
+            @Parameter(description = "Cancellation data", required = true)
+            @RequestBody @Valid CancelReservationDto cancelReservationDto) {
+        return productRepository.findById(id)
+                .map(product -> inventoryRepository.findByProductId(id)
+                        .map(inventory -> {
+                            if (cancelReservationDto.quantity() > inventory.getReservedQuantity()) {
+                                return ResponseEntity.badRequest().<InventoryReceiptDto>build();
+                            }
+
+                            inventory.setReservedQuantity(inventory.getReservedQuantity() - cancelReservationDto.quantity());
                             product.setInStock(inventory.getQuantity() > inventory.getReservedQuantity());
 
                             Inventory savedInventory = inventoryRepository.save(inventory);
