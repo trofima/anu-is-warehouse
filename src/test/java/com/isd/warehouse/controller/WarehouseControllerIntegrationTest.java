@@ -210,12 +210,12 @@ class WarehouseControllerIntegrationTest {
     }
 
     @Nested
-    @DisplayName("GET /api/products/{id} - Verify Created Product")
-    class VerifyCreatedProduct {
+    @DisplayName("GET /api/products/{id} - Get Product by ID")
+    class GetProductById {
 
         @Test
-        @DisplayName("should be able to retrieve created product by ID")
-        void shouldBeAbleToRetrieveCreatedProduct() throws Exception {
+        @DisplayName("should return product when valid ID is provided")
+        void shouldReturnProductWhenValidId() throws Exception {
             Product product = new Product();
             product.setName("Smartphone");
             product.setDescription("Latest model");
@@ -233,6 +233,38 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.price", is(699.99)))
                 .andExpect(jsonPath("$.category", is("Electronics")))
                 .andExpect(jsonPath("$.inStock", is(true)));
+        }
+
+        @Test
+        @DisplayName("should return product with null optional fields")
+        void shouldReturnProductWithNullOptionalFields() throws Exception {
+            Product product = new Product();
+            product.setName("Basic Item");
+            product.setPrice(new BigDecimal("19.99"));
+            product.setInStock(false);
+            Product savedProduct = productRepository.save(product);
+
+            mockMvc.perform(get("/api/products/" + savedProduct.getId()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id", is(savedProduct.getId().intValue())))
+                .andExpect(jsonPath("$.name", is("Basic Item")))
+                .andExpect(jsonPath("$.price", is(19.99)))
+                .andExpect(jsonPath("$.inStock", is(false)));
+        }
+
+        @Test
+        @DisplayName("should return 404 when product does not exist")
+        void shouldReturn404WhenProductDoesNotExist() throws Exception {
+            mockMvc.perform(get("/api/products/99999"))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("should return 404 when non-numeric ID is provided")
+        void shouldReturn404WhenNonNumericIdProvided() throws Exception {
+            mockMvc.perform(get("/api/products/invalid-id"))
+                .andExpect(status().isBadRequest());
         }
     }
 }
