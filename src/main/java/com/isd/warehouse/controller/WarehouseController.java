@@ -4,6 +4,14 @@ import com.isd.warehouse.entities.Product;
 import com.isd.warehouse.dtos.ProductDto;
 import com.isd.warehouse.repository.ProductRepository;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Warehouse", description = "Product management APIs")
 @RestController
 @RequestMapping("/api/products")
 public class WarehouseController {
@@ -31,12 +40,21 @@ public class WarehouseController {
         this.productRepository = productRepository;
     }
 
+    @Operation(summary = "List all products", description = "Returns a list of products with optional filtering by name, category, price range, and stock status")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved product list")
+    })
     @GetMapping
     public List<Product> list(
+            @Parameter(description = "Filter by product name (case-insensitive partial match)")
             @RequestParam(required = false) String name,
+            @Parameter(description = "Filter by category (exact match, case-insensitive)")
             @RequestParam(required = false) String category,
+            @Parameter(description = "Minimum price filter")
             @RequestParam(required = false) BigDecimal minPrice,
+            @Parameter(description = "Maximum price filter")
             @RequestParam(required = false) BigDecimal maxPrice,
+            @Parameter(description = "Filter by stock availability")
             @RequestParam(required = false) Boolean inStock) {
 
         return productRepository.findAll().stream()
@@ -48,15 +66,29 @@ public class WarehouseController {
                 .collect(Collectors.toList());
     }
 
+    @Operation(summary = "Get a product by ID", description = "Returns a single product by its unique identifier")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Product found"),
+        @ApiResponse(responseCode = "404", description = "Product not found", content = @Content)
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<Product> get(@PathVariable Long id) {
+    public ResponseEntity<Product> get(
+            @Parameter(description = "Product ID", required = true)
+            @PathVariable Long id) {
         return productRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @Operation(summary = "Create a new product", description = "Creates a new product in the warehouse")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Product created successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid input data", content = @Content)
+    })
     @PostMapping
-    public ResponseEntity<Product> create(@RequestBody @Valid ProductDto productDto) {
+    public ResponseEntity<Product> create(
+            @Parameter(description = "Product data", required = true)
+            @RequestBody @Valid ProductDto productDto) {
         Product product = new Product();
         product.setName(productDto.name());
         product.setDescription(productDto.description());
@@ -67,8 +99,18 @@ public class WarehouseController {
         return new ResponseEntity<>(savedProduct, HttpStatus.CREATED);
     }
 
+    @Operation(summary = "Update a product", description = "Updates an existing product by its ID")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Product updated successfully"),
+        @ApiResponse(responseCode = "404", description = "Product not found", content = @Content),
+        @ApiResponse(responseCode = "400", description = "Invalid input data", content = @Content)
+    })
     @PutMapping("/{id}")
-    public ResponseEntity<Product> update(@PathVariable Long id, @RequestBody @Valid ProductDto productDto) {
+    public ResponseEntity<Product> update(
+            @Parameter(description = "Product ID", required = true)
+            @PathVariable Long id,
+            @Parameter(description = "Updated product data", required = true)
+            @RequestBody @Valid ProductDto productDto) {
         return productRepository.findById(id)
                 .map(existingProduct -> {
                     existingProduct.setName(productDto.name());
@@ -81,8 +123,15 @@ public class WarehouseController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @Operation(summary = "Delete a product", description = "Deletes a product by its ID")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "204", description = "Product deleted successfully"),
+        @ApiResponse(responseCode = "404", description = "Product not found", content = @Content)
+    })
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(
+            @Parameter(description = "Product ID", required = true)
+            @PathVariable Long id) {
         if (!productRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
