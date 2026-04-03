@@ -1,0 +1,1 @@
+alter table products add column photos varchar(255);
