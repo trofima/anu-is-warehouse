@@ -4,6 +4,7 @@ import com.isd.warehouse.dtos.InventoryReceiptDto;
 import com.isd.warehouse.entities.Product;
 import com.isd.warehouse.dtos.ProductDto;
 import com.isd.warehouse.dtos.ReceiveProductDto;
+import com.isd.warehouse.dtos.ReserveProductDto;
 import com.isd.warehouse.entities.Inventory;
 import com.isd.warehouse.repository.InventoryRepository;
 import com.isd.warehouse.repository.ProductRepository;
@@ -175,6 +176,38 @@ public class WarehouseController {
 
                     return ResponseEntity.ok(toInventoryReceiptDto(savedInventory));
                 })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "Reserve product stock", description = "Reserves available warehouse inventory for a product")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Product stock reserved successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid reservation data or insufficient stock", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Product or inventory not found", content = @Content)
+    })
+    @PostMapping("/{id}/reserve")
+    public ResponseEntity<InventoryReceiptDto> reserve(
+            @Parameter(description = "Product ID", required = true)
+            @PathVariable Long id,
+            @Parameter(description = "Reservation data", required = true)
+            @RequestBody @Valid ReserveProductDto reserveProductDto) {
+        return productRepository.findById(id)
+                .map(product -> inventoryRepository.findByProductId(id)
+                        .map(inventory -> {
+                            int availableQuantity = inventory.getQuantity() - inventory.getReservedQuantity();
+                            if (reserveProductDto.quantity() > availableQuantity) {
+                                return ResponseEntity.badRequest().<InventoryReceiptDto>build();
+                            }
+
+                            inventory.setReservedQuantity(inventory.getReservedQuantity() + reserveProductDto.quantity());
+                            product.setInStock(inventory.getQuantity() > inventory.getReservedQuantity());
+
+                            Inventory savedInventory = inventoryRepository.save(inventory);
+                            productRepository.save(product);
+
+                            return ResponseEntity.ok(toInventoryReceiptDto(savedInventory));
+                        })
+                        .orElse(ResponseEntity.notFound().build()))
                 .orElse(ResponseEntity.notFound().build());
     }
 

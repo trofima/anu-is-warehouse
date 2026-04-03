@@ -373,4 +373,146 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(status().isBadRequest());
         }
     }
+
+    @Nested
+    @DisplayName("POST /api/products/{id}/reserve - Reserve Product Stock")
+    class ReserveProductStock {
+
+        @Test
+        @DisplayName("should reserve available stock")
+        void shouldReserveAvailableStock() throws Exception {
+            Product product = new Product();
+            product.setName("Headset");
+            product.setPrice(new BigDecimal("149.99"));
+            product.setInStock(true);
+            Product savedProduct = productRepository.save(product);
+
+            Inventory inventory = new Inventory();
+            inventory.setProduct(savedProduct);
+            inventory.setQuantity(10);
+            inventory.setReservedQuantity(3);
+            inventoryRepository.save(inventory);
+
+            mockMvc.perform(post("/api/products/" + savedProduct.getId() + "/reserve")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 4
+                        }
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.productId", is(savedProduct.getId().intValue())))
+                .andExpect(jsonPath("$.quantity", is(10)))
+                .andExpect(jsonPath("$.reservedQuantity", is(7)))
+                .andExpect(jsonPath("$.availableQuantity", is(3)));
+
+            Inventory updatedInventory = inventoryRepository.findByProductId(savedProduct.getId()).orElseThrow();
+            assertEquals(10, updatedInventory.getQuantity());
+            assertEquals(7, updatedInventory.getReservedQuantity());
+            assertEquals(true, productRepository.findById(savedProduct.getId()).orElseThrow().isInStock());
+        }
+
+        @Test
+        @DisplayName("should mark product out of stock when all quantity becomes reserved")
+        void shouldMarkProductOutOfStockWhenFullyReserved() throws Exception {
+            Product product = new Product();
+            product.setName("Webcam");
+            product.setPrice(new BigDecimal("79.99"));
+            product.setInStock(true);
+            Product savedProduct = productRepository.save(product);
+
+            Inventory inventory = new Inventory();
+            inventory.setProduct(savedProduct);
+            inventory.setQuantity(6);
+            inventory.setReservedQuantity(1);
+            inventoryRepository.save(inventory);
+
+            mockMvc.perform(post("/api/products/" + savedProduct.getId() + "/reserve")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 5
+                        }
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity", is(6)))
+                .andExpect(jsonPath("$.reservedQuantity", is(6)))
+                .andExpect(jsonPath("$.availableQuantity", is(0)));
+
+            assertEquals(false, productRepository.findById(savedProduct.getId()).orElseThrow().isInStock());
+        }
+
+        @Test
+        @DisplayName("should return 404 when reserving stock for product without inventory")
+        void shouldReturn404WhenInventoryDoesNotExist() throws Exception {
+            Product product = new Product();
+            product.setName("Speaker");
+            product.setPrice(new BigDecimal("199.99"));
+            product.setInStock(false);
+            Product savedProduct = productRepository.save(product);
+
+            mockMvc.perform(post("/api/products/" + savedProduct.getId() + "/reserve")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 1
+                        }
+                        """))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("should return 400 when reservation exceeds available stock")
+        void shouldReturn400WhenReservationExceedsAvailableStock() throws Exception {
+            Product product = new Product();
+            product.setName("Microphone");
+            product.setPrice(new BigDecimal("129.99"));
+            product.setInStock(true);
+            Product savedProduct = productRepository.save(product);
+
+            Inventory inventory = new Inventory();
+            inventory.setProduct(savedProduct);
+            inventory.setQuantity(8);
+            inventory.setReservedQuantity(6);
+            inventoryRepository.save(inventory);
+
+            mockMvc.perform(post("/api/products/" + savedProduct.getId() + "/reserve")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 3
+                        }
+                        """))
+                .andExpect(status().isBadRequest());
+
+            Inventory unchangedInventory = inventoryRepository.findByProductId(savedProduct.getId()).orElseThrow();
+            assertEquals(6, unchangedInventory.getReservedQuantity());
+        }
+
+        @Test
+        @DisplayName("should return 400 when reservation quantity is zero")
+        void shouldReturn400WhenReservationQuantityIsZero() throws Exception {
+            Product product = new Product();
+            product.setName("Charger");
+            product.setPrice(new BigDecimal("39.99"));
+            product.setInStock(true);
+            Product savedProduct = productRepository.save(product);
+
+            Inventory inventory = new Inventory();
+            inventory.setProduct(savedProduct);
+            inventory.setQuantity(5);
+            inventory.setReservedQuantity(0);
+            inventoryRepository.save(inventory);
+
+            mockMvc.perform(post("/api/products/" + savedProduct.getId() + "/reserve")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "quantity": 0
+                        }
+                        """))
+                .andExpect(status().isBadRequest());
+        }
+    }
 }
