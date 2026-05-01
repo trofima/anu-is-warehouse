@@ -181,8 +181,8 @@ public class WarehouseController {
                     productRepository.save(product);
 
                     return ResponseEntity.ok(toInventoryReceiptDto(savedInventory));
-                })
-                .orElse(ResponseEntity.notFound().build());
+                }).orElseThrow(() -> new RuntimeException("Not found"));
+
     }
 
     @Operation(summary = "Reserve product stock", description = "Reserves available warehouse inventory for a product")
