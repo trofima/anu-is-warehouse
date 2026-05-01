@@ -4,6 +4,7 @@ import com.isd.warehouse.dtos.CancelReservationDto;
 import com.isd.warehouse.dtos.InventoryReceiptDto;
 import com.isd.warehouse.dtos.FulfillProductDto;
 import com.isd.warehouse.entities.Product;
+import com.isd.warehouse.dtos.ProductResponseDto;
 import com.isd.warehouse.dtos.ProductDto;
 import com.isd.warehouse.dtos.ReceiveProductDto;
 import com.isd.warehouse.dtos.ReserveProductDto;
@@ -53,7 +54,7 @@ public class WarehouseController {
         @ApiResponse(responseCode = "200", description = "Successfully retrieved product list")
     })
     @GetMapping
-    public List<Product> list(
+    public List<ProductResponseDto> list(
             @Parameter(description = "Filter by product name (case-insensitive partial match)")
             @RequestParam(required = false) String name,
             @Parameter(description = "Filter by category (exact match, case-insensitive)")
@@ -71,30 +72,32 @@ public class WarehouseController {
                 .filter(product -> minPrice == null || (product.getPrice() != null && product.getPrice().compareTo(minPrice) >= 0))
                 .filter(product -> maxPrice == null || (product.getPrice() != null && product.getPrice().compareTo(maxPrice) <= 0))
                 .filter(product -> inStock == null || product.isInStock() == inStock)
+                .map(this::toProductResponseDto)
                 .collect(Collectors.toList());
     }
 
     @Operation(summary = "Get a product by ID", description = "Returns a single product by its unique identifier")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Product found"),
+        @ApiResponse(responseCode = "200", description = "Product found", content = @Content(mediaType = "application/json")),
         @ApiResponse(responseCode = "404", description = "Product not found", content = @Content)
     })
     @GetMapping("/{id}")
-    public ResponseEntity<Product> get(
+    public ResponseEntity<ProductResponseDto> get(
             @Parameter(description = "Product ID", required = true)
             @PathVariable Long id) {
         return productRepository.findById(id)
+                .map(this::toProductResponseDto)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @Operation(summary = "Create a new product", description = "Creates a new product in the warehouse")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "201", description = "Product created successfully"),
+        @ApiResponse(responseCode = "201", description = "Product created successfully", content = @Content(mediaType = "application/json")),
         @ApiResponse(responseCode = "400", description = "Invalid input data", content = @Content)
     })
     @PostMapping
-    public ResponseEntity<Product> create(
+    public ResponseEntity<ProductResponseDto> create(
             @Parameter(description = "Product data", required = true)
             @RequestBody @Valid ProductDto productDto) {
         Product product = new Product();
@@ -104,17 +107,17 @@ public class WarehouseController {
         product.setCategory(productDto.category());
         product.setInStock(productDto.inStock());
         Product savedProduct = productRepository.save(product);
-        return new ResponseEntity<>(savedProduct, HttpStatus.CREATED);
+        return new ResponseEntity<>(toProductResponseDto(savedProduct), HttpStatus.CREATED);
     }
 
     @Operation(summary = "Update a product", description = "Updates an existing product by its ID")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Product updated successfully"),
+        @ApiResponse(responseCode = "200", description = "Product updated successfully", content = @Content(mediaType = "application/json")),
         @ApiResponse(responseCode = "404", description = "Product not found", content = @Content),
         @ApiResponse(responseCode = "400", description = "Invalid input data", content = @Content)
     })
     @PutMapping("/{id}")
-    public ResponseEntity<Product> update(
+    public ResponseEntity<ProductResponseDto> update(
             @Parameter(description = "Product ID", required = true)
             @PathVariable Long id,
             @Parameter(description = "Updated product data", required = true)
@@ -126,7 +129,8 @@ public class WarehouseController {
                     existingProduct.setPrice(productDto.price());
                     existingProduct.setCategory(productDto.category());
                     existingProduct.setInStock(productDto.inStock());
-                    return ResponseEntity.ok(productRepository.save(existingProduct));
+                    Product updatedProduct = productRepository.save(existingProduct);
+                    return ResponseEntity.ok(toProductResponseDto(updatedProduct));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -282,5 +286,21 @@ public class WarehouseController {
                 inventory.getQuantity(),
                 inventory.getReservedQuantity(),
                 inventory.getQuantity() - inventory.getReservedQuantity());
+    }
+
+    private ProductResponseDto toProductResponseDto(Product product) {
+        int availableQuantity = inventoryRepository.findByProductId(product.getId())
+                .map(inv -> inv.getQuantity() - inv.getReservedQuantity())
+                .orElse(0);
+
+        return new ProductResponseDto(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getPrice(),
+                product.getCategory(),
+                product.isInStock(),
+                availableQuantity
+        );
     }
 }

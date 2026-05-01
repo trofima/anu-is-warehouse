@@ -85,7 +85,8 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.description", is("High-end gaming laptop")))
                 .andExpect(jsonPath("$.price", is(1299.99)))
                 .andExpect(jsonPath("$.category", is("Electronics")))
-                .andExpect(jsonPath("$.inStock", is(true)));
+                .andExpect(jsonPath("$.inStock", is(true)))
+                .andExpect(jsonPath("$.availableQuantity", is(0)));
         }
 
         @Test
@@ -133,7 +134,8 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.id", notNullValue()))
                 .andExpect(jsonPath("$.name", is("Basic Item")))
                 .andExpect(jsonPath("$.price", is(9.99)))
-                .andExpect(jsonPath("$.inStock", is(false)));
+                .andExpect(jsonPath("$.inStock", is(false)))
+                .andExpect(jsonPath("$.availableQuantity", is(0)));
 
             assertEquals(1, productRepository.count());
         }
@@ -231,6 +233,12 @@ class WarehouseControllerIntegrationTest {
             product.setInStock(true);
             Product savedProduct = productRepository.save(product);
 
+            Inventory inventory = new Inventory();
+            inventory.setProduct(savedProduct);
+            inventory.setQuantity(20);
+            inventory.setReservedQuantity(5);
+            inventoryRepository.save(inventory);
+
             mockMvc.perform(get("/api/products/" + savedProduct.getId()))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -239,7 +247,8 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.description", is("Latest model")))
                 .andExpect(jsonPath("$.price", is(699.99)))
                 .andExpect(jsonPath("$.category", is("Electronics")))
-                .andExpect(jsonPath("$.inStock", is(true)));
+                .andExpect(jsonPath("$.inStock", is(true)))
+                .andExpect(jsonPath("$.availableQuantity", is(15)));
         }
 
         @Test
@@ -257,7 +266,8 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.id", is(savedProduct.getId().intValue())))
                 .andExpect(jsonPath("$.name", is("Basic Item")))
                 .andExpect(jsonPath("$.price", is(19.99)))
-                .andExpect(jsonPath("$.inStock", is(false)));
+                .andExpect(jsonPath("$.inStock", is(false)))
+                .andExpect(jsonPath("$.availableQuantity", is(0)));
         }
 
         @Test
@@ -272,6 +282,55 @@ class WarehouseControllerIntegrationTest {
         void shouldReturn404WhenNonNumericIdProvided() throws Exception {
             mockMvc.perform(get("/api/products/invalid-id"))
                 .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/products - List Products")
+    class ListProducts {
+
+        @Test
+        @DisplayName("should return list of product DTOs with availability")
+        void shouldReturnProductListWithAvailability() throws Exception {
+            Product p1 = new Product();
+            p1.setName("Item A");
+            p1.setDescription("Description A");
+            p1.setCategory("Category A");
+            p1.setPrice(new BigDecimal("10.00"));
+            p1.setInStock(true);
+            p1 = productRepository.save(p1);
+
+            Inventory i1 = new Inventory();
+            i1.setProduct(p1);
+            i1.setQuantity(10);
+            i1.setReservedQuantity(2);
+            inventoryRepository.save(i1);
+
+            Product p2 = new Product();
+            p2.setName("Item B");
+            p2.setDescription("Description B");
+            p2.setCategory("Category B");
+            p2.setPrice(new BigDecimal("20.00"));
+            p2.setInStock(false);
+            p2 = productRepository.save(p2); // No inventory for p2
+
+            mockMvc.perform(get("/api/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(2)))
+                .andExpect(jsonPath("$[0].id", is(p1.getId().intValue())))
+                .andExpect(jsonPath("$[0].name", is("Item A")))
+                .andExpect(jsonPath("$[0].description", is("Description A")))
+                .andExpect(jsonPath("$[0].price", is(10.00)))
+                .andExpect(jsonPath("$[0].category", is("Category A")))
+                .andExpect(jsonPath("$[0].inStock", is(true)))
+                .andExpect(jsonPath("$[0].availableQuantity", is(8)))
+                .andExpect(jsonPath("$[1].id", is(p2.getId().intValue())))
+                .andExpect(jsonPath("$[1].name", is("Item B")))
+                .andExpect(jsonPath("$[1].description", is("Description B")))
+                .andExpect(jsonPath("$[1].price", is(20.00)))
+                .andExpect(jsonPath("$[1].category", is("Category B")))
+                .andExpect(jsonPath("$[1].inStock", is(false)))
+                .andExpect(jsonPath("$[1].availableQuantity", is(0)));
         }
     }
 
