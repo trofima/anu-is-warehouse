@@ -86,7 +86,8 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.price", is(1299.99)))
                 .andExpect(jsonPath("$.category", is("Electronics")))
                 .andExpect(jsonPath("$.inStock", is(true)))
-                .andExpect(jsonPath("$.availableQuantity", is(0)));
+                .andExpect(jsonPath("$.reservedQuantity", is(0)))
+                .andExpect(jsonPath("$.quantity", is(0)));
         }
 
         @Test
@@ -135,7 +136,8 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.name", is("Basic Item")))
                 .andExpect(jsonPath("$.price", is(9.99)))
                 .andExpect(jsonPath("$.inStock", is(false)))
-                .andExpect(jsonPath("$.availableQuantity", is(0)));
+                .andExpect(jsonPath("$.reservedQuantity", is(0)))
+                .andExpect(jsonPath("$.quantity", is(0)));
 
             assertEquals(1, productRepository.count());
         }
@@ -248,7 +250,8 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.price", is(699.99)))
                 .andExpect(jsonPath("$.category", is("Electronics")))
                 .andExpect(jsonPath("$.inStock", is(true)))
-                .andExpect(jsonPath("$.availableQuantity", is(15)));
+                .andExpect(jsonPath("$.reservedQuantity", is(5)))
+                .andExpect(jsonPath("$.quantity", is(20)));
         }
 
         @Test
@@ -267,7 +270,8 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$.name", is("Basic Item")))
                 .andExpect(jsonPath("$.price", is(19.99)))
                 .andExpect(jsonPath("$.inStock", is(false)))
-                .andExpect(jsonPath("$.availableQuantity", is(0)));
+                .andExpect(jsonPath("$.reservedQuantity", is(0)))
+                .andExpect(jsonPath("$.quantity", is(0)));
         }
 
         @Test
@@ -323,14 +327,16 @@ class WarehouseControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].price", is(10.00)))
                 .andExpect(jsonPath("$[0].category", is("Category A")))
                 .andExpect(jsonPath("$[0].inStock", is(true)))
-                .andExpect(jsonPath("$[0].availableQuantity", is(8)))
+                .andExpect(jsonPath("$[0].reservedQuantity", is(2)))
+                .andExpect(jsonPath("$[0].quantity", is(10)))
                 .andExpect(jsonPath("$[1].id", is(p2.getId().intValue())))
                 .andExpect(jsonPath("$[1].name", is("Item B")))
                 .andExpect(jsonPath("$[1].description", is("Description B")))
                 .andExpect(jsonPath("$[1].price", is(20.00)))
                 .andExpect(jsonPath("$[1].category", is("Category B")))
                 .andExpect(jsonPath("$[1].inStock", is(false)))
-                .andExpect(jsonPath("$[1].availableQuantity", is(0)));
+                .andExpect(jsonPath("$[1].reservedQuantity", is(0)))
+                .andExpect(jsonPath("$[1].quantity", is(0)));
         }
     }
 

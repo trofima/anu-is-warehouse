@@ -9,5 +9,6 @@ public record ProductResponseDto(
     BigDecimal price,
     String category,
     boolean inStock,
-    int availableQuantity
+    int reservedQuantity,
+    int quantity
 ) {}
