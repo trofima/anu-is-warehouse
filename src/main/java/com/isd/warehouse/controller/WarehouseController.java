@@ -289,9 +289,9 @@ public class WarehouseController {
     }
 
     private ProductResponseDto toProductResponseDto(Product product) {
-        int availableQuantity = inventoryRepository.findByProductId(product.getId())
-                .map(inv -> inv.getQuantity() - inv.getReservedQuantity())
-                .orElse(0);
+        Inventory inventory = inventoryRepository.findByProductId(product.getId()).orElse(null);
+        int quantity = inventory != null ? inventory.getQuantity() : 0;
+        int reservedQuantity = inventory != null ? inventory.getReservedQuantity() : 0;
 
         return new ProductResponseDto(
                 product.getId(),
@@ -300,7 +300,8 @@ public class WarehouseController {
                 product.getPrice(),
                 product.getCategory(),
                 product.isInStock(),
-                availableQuantity
+                reservedQuantity,
+                quantity
         );
     }
 }
